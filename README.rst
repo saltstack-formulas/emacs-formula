@@ -1,0 +1,7 @@
+emacs
+=====
+
+emacs
+-----
+
+Install emacs
