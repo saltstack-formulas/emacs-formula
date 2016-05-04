@@ -1,7 +1,7 @@
 {%- load_yaml as emacs_defaults %}
 prefix: /usr/local/lib
 version: 25.0.91
-base_url: "https://github.com/emacs-mirror/emacs/archive/emacs-%(version)s.tar.gz"
+archive_url: "https://github.com/emacs-mirror/emacs/archive/emacs-%(version)s.tar.gz"
 alt_home: /usr/local/lib/emacs
 from_pkg: True
 build_dir: /usr/local/src
