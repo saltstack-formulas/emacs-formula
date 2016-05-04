@@ -1,34 +1,33 @@
 {% from 'emacs/settings.sls' import emacs with context %}
 
 {%- if emacs.from_pkg == True %}
-## This is the default behavior, milk-toast if you will.
-boring-emacs:
+install-emacs:
   pkg.installed:
-    - name: emacs
-
+    - pkgs:
+        - emacs
 {% else %}
-# You have chosen wisely but your journey to the great Basillica of St. Stallman has only begin!
-{% set build_dir = '/usr/local/src' %}
 
+
+## Pull down a github release of the desired version
 {% with url = 'https://github.com/emacs-mirror/emacs/archive/%s.tar.gz'|format(emacs.name) %}
 emacs|fetch-release:
   archive.extracted:
-    - name: {{ build_dir }}
+    - name: {{ emacs.build_dir }}
     - source: {{ url }}
     - archive_format: tar
     - source_hash: {{ emacs.hash }}
     - user: root
     - group: root
-    - if_missing: {{ build_dir }}/{{ emacs.name }}
+    - if_missing: {{ emacs.build_dir }}/{{ emacs.name }}
       
   file.rename:
-    - name: {{ build_dir }}/{{ emacs.name }}
-    - source: {{ build_dir }}/emacs-{{ emacs.name }}
+    - name: {{ emacs.build_dir }}/{{ emacs.name }}
+    - source: {{ emacs.build_dir }}/emacs-{{ emacs.name }}
     - force: true
 {% endwith %}
 
 
-emacs|source-install:
+emacs|dependencies:
   pkg.installed:
     - ignore_installed: true
     - reload_modules: true
@@ -37,8 +36,8 @@ emacs|source-install:
         - build-essential
         - texinfo
 
+
 emacs|create-directories:
-  # make sure the working dirs are present
   file.directory:
     - names:
         - {{ emacs.prefix }}
@@ -56,10 +55,13 @@ emacs|configure-compile:
   #
   # :NOTE: Someone may want to run the X version and it is disabled here explicitly because
   #   building the X version took even longer. These flags should probably come from a pillar
+  #
+  # :NOTE: This should really be broken up into separate steps since configre and make can each take
+  #   several minutes to complete on the smaller systems. 
   cmd.run:
     - name: |
         apt-get build-dep emacs24
-        cd {{ build_dir }}/{{ emacs.name }}
+        cd {{ emacs.build_dir }}/{{ emacs.name }}
         ./autogen.sh
         ./configure --prefix={{ emacs.real_home }} --with-x-toolkit=no --without-x
         make
@@ -69,7 +71,7 @@ emacs|configure-compile:
     - unless:
         - test -x {{ emacs.real_home }}/bin/emacs-{{ emacs.version }}
 
-    - cwd: {{ build_dir }}
+    - cwd: {{ emacs.build_dir }}
     - require:
         - file: emacs|fetch-release
         - file: emacs|create-directories
@@ -83,7 +85,8 @@ emacs|configure-compile:
     - require:
         - cmd: emacs|configure-compile
   
-# Iterate over the executables and symlink them into /usr/bin
+# the above build has created binaries in {{ emacs.bin_dir }} and in order to
+# preserve the ability to switch between versions, sym-links are created in /usr/bin
 {%- for tag in ['ctags','ebrowse','emacsclient','etags'] %}
 emacs|link-{{ tag }}:
   alternatives.install:
@@ -95,8 +98,8 @@ emacs|link-{{ tag }}:
         - cmd: emacs|configure-compile
 {% endfor %}
 
-## Finally, we create a sym-link to our shiny new pinky-bending pal at /usr/bin/emacs
-# the version is baked into the executable name and we want the friendlier `emacs` command
+# The emacs binary is built with the version baked into the name (emacs-25.0.91)
+# create a sym-link with a high priority at `/usr/bin/emacs`
 emacs|post-install:
   alternatives.install:
     - name: emacs

@@ -6,6 +6,7 @@ alt_home: /usr/local/lib/emacs
 repo_url: "https://github.com/emacs-mirror/emacs.git"
 source_dir: /usr/local/src/emacs
 from_pkg: True
+build_dir: /usr/local/src
 {%- endload %}
 
 {% set emacs = salt['pillar.get']('emacs', emacs_defaults, merge=True) %}
