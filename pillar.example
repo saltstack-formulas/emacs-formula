@@ -1,0 +1,15 @@
+##
+# By placing this somewhere in the top level of your pillars will get you with
+# vanilla emacs installed at /usr/local/lib/emacs-25-0.91/bin/emacs.
+# Because it takes so damn long to compile emacs, it is disabled by default. You'll
+#
+# If you're an adventurous type and have a spare 20mins, set `from_pkg: False`, otherwise
+# don't do anything and you'll end up with emacs-24.3(ish) on Ubuntu.
+##
+emacs:
+  prefix: /usr/local/lib
+  version: 25.0.91
+  alt_home: /usr/local/lib/emacs
+  repo_url: "https://github.com/emacs-mirror/emacs.git"
+  source_dir: /usr/local/src/emacs
+  from_pkg: False
