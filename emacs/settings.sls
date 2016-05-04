@@ -3,8 +3,6 @@ prefix: /usr/local/lib
 version: 25.0.91
 base_url: "https://github.com/emacs-mirror/emacs/archive/emacs-%(version)s.tar.gz"
 alt_home: /usr/local/lib/emacs
-repo_url: "https://github.com/emacs-mirror/emacs.git"
-source_dir: /usr/local/src/emacs
 from_pkg: True
 build_dir: /usr/local/src
 {%- endload %}
