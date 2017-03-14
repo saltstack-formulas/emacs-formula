@@ -12,7 +12,7 @@ install-emacs:
 emacs-fetch-release:
   archive.extracted:
     - name: {{ emacs.build_dir }}
-    - source: {{ emacs.archive_url|format(emacs.version) }}
+    - source: {{ emacs.archive_url % emacs }}
     - archive_format: tar
     - source_hash: {{ emacs.hash }}
     - user: root
