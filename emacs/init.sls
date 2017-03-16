@@ -12,7 +12,7 @@ install-emacs:
 emacs-fetch-release:
   archive.extracted:
     - name: {{ emacs.build_dir }}
-    - source: {{ emacs.archive_url|format(emacs.version) }}
+    - source: {{ emacs.archive_url % emacs }}
     - archive_format: tar
     - source_hash: {{ emacs.hash }}
     - user: root
@@ -23,8 +23,16 @@ emacs-fetch-release:
     - name: {{ emacs.build_dir }}/{{ emacs.name }}
     - source: {{ emacs.build_dir }}/emacs-{{ emacs.name }}
     - force: true
-
-emacs-dependencies:
+    - require:
+        - archive: emacs-fetch-release
+          
+emacs-deps:
+  cmd.run:
+    - name: |
+        apt-get -y build-dep emacs24
+    - shell: /bin/bash
+    - require:
+        - pkg: emacs-deps
   pkg.installed:
     - ignore_installed: true
     - reload_modules: true
@@ -32,6 +40,7 @@ emacs-dependencies:
         - git
         - build-essential
         - texinfo
+        - automake
 
 emacs-create-directories:
   file.directory:
@@ -41,10 +50,21 @@ emacs-create-directories:
     - group: root
     - mode: 755
     - makedirs: true
-    - require:
-        - pkg: emacs-source-install
 
-emacs-configure-compile:
+emacs-autogen-source:
+  cmd.run:
+    - name: |
+        cd {{ emacs.build_dir }}/{{ emacs.name }}
+        ./autogen.sh
+    - shell: /bin/bash
+    - cwd: {{ emacs.build_dir }}/{{ emacs.name }}
+    - unless:
+        - test -x {{ emacs.real_home }}/bin/emacs-{{ emacs.version }}
+    - require:
+        - file: emacs-fetch-release
+        - pkg: emacs-deps
+
+emacs-configure:
   # I couldn't figure out how to run `build-dep` using a state so I poked that bit
   # into the build command.  If all goes well, we should have an emacs install by
   # the time the water for your locally-sourced artisinal chai has had time to boil.
@@ -56,12 +76,8 @@ emacs-configure-compile:
   #   several minutes to complete on the smaller systems. 
   cmd.run:
     - name: |
-        apt-get build-dep emacs24
         cd {{ emacs.build_dir }}/{{ emacs.name }}
-        ./autogen.sh
         ./configure --prefix={{ emacs.real_home }} --with-x-toolkit=no --without-x
-        make
-        make install
     - shell: /bin/bash
     - timeout: 3000
     - unless:
@@ -71,7 +87,38 @@ emacs-configure-compile:
     - require:
         - file: emacs-fetch-release
         - file: emacs-create-directories
+        - cmd: emacs-deps
+        - cmd: emacs-autogen-source
           
+emacs-make:
+  cmd.run:
+    - name: |
+        cd {{ emacs.build_dir }}/{{ emacs.name }}        
+        make
+    - shell: /bin/bash
+    - timeout: 3000
+    - unless:
+        - test -x {{ emacs.real_home }}/bin/emacs-{{ emacs.version }}
+
+    - cwd: {{ emacs.build_dir }}
+    - require:
+        - cmd: emacs-configure
+
+emacs-make-install:
+  cmd.run:
+    - name: |
+        cd {{ emacs.build_dir }}/{{ emacs.name }}        
+        make install
+    - shell: /bin/bash
+    - timeout: 3000
+    - unless:
+        - test -x {{ emacs.real_home }}/bin/emacs-{{ emacs.version }}
+
+    - cwd: {{ emacs.build_dir }}
+    - require:
+        - cmd: emacs-make
+
+emacs-alternatives:
   # should end up something like /usr/lib/emacs pointing to this version
   alternatives.install:
     - name: emacs-home-link
@@ -79,7 +126,8 @@ emacs-configure-compile:
     - path: {{ emacs.real_home }}
     - priority: 30
     - require:
-        - cmd: emacs-configure-compile
+        - cmd: emacs-make-install
+        - cmd: emacs-make
   
 # the above build has created binaries in {{ emacs.bin_dir }} and in order to
 # preserve the ability to switch between versions, sym-links are created in /usr/bin
@@ -91,7 +139,8 @@ emacs-link-{{ tag }}:
     - path: {{ emacs.bin_dir }}/{{ tag }}
     - priority: 999
     - require:
-        - cmd: emacs-configure-compile
+        - cmd: emacs-make-install
+        - alternatives: emacs-alternatives
 {% endfor %}
 
 # The emacs binary is built with the version baked into the name (emacs-25.0.91)
@@ -103,5 +152,6 @@ emacs-post-install:
     - path: {{ emacs.bin_dir }}/emacs-{{ emacs.version }}
     - priority: 999
     - require:
-        - cmd: emacs-source-install
+        - cmd: emacs-make-install        
+        - alternatives: emacs-alternatives
 {% endif %}
