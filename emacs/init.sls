@@ -29,7 +29,7 @@ emacs-fetch-release:
 emacs-deps:
   cmd.run:
     - name: |
-        apt-get build-dep emacs24
+        apt-get -y build-dep emacs24
     - shell: /bin/bash
     - require:
         - pkg: emacs-deps
@@ -58,6 +58,8 @@ emacs-autogen-source:
         ./autogen.sh
     - shell: /bin/bash
     - cwd: {{ emacs.build_dir }}/{{ emacs.name }}
+    - unless:
+        - test -x {{ emacs.real_home }}/bin/emacs-{{ emacs.version }}
     - require:
         - file: emacs-fetch-release
         - pkg: emacs-deps
@@ -106,7 +108,7 @@ emacs-make-install:
   cmd.run:
     - name: |
         cd {{ emacs.build_dir }}/{{ emacs.name }}        
-        make
+        make install
     - shell: /bin/bash
     - timeout: 3000
     - unless:
@@ -115,7 +117,8 @@ emacs-make-install:
     - cwd: {{ emacs.build_dir }}
     - require:
         - cmd: emacs-make
-  
+
+emacs-alternatives:
   # should end up something like /usr/lib/emacs pointing to this version
   alternatives.install:
     - name: emacs-home-link
@@ -124,6 +127,7 @@ emacs-make-install:
     - priority: 30
     - require:
         - cmd: emacs-make-install
+        - cmd: emacs-make
   
 # the above build has created binaries in {{ emacs.bin_dir }} and in order to
 # preserve the ability to switch between versions, sym-links are created in /usr/bin
@@ -135,7 +139,8 @@ emacs-link-{{ tag }}:
     - path: {{ emacs.bin_dir }}/{{ tag }}
     - priority: 999
     - require:
-        - alternatives: emacs-make-install
+        - cmd: emacs-make-install
+        - alternatives: emacs-alternatives
 {% endfor %}
 
 # The emacs binary is built with the version baked into the name (emacs-25.0.91)
@@ -147,5 +152,6 @@ emacs-post-install:
     - path: {{ emacs.bin_dir }}/emacs-{{ emacs.version }}
     - priority: 999
     - require:
-        - alternatives: emacs-make-install
+        - cmd: emacs-make-install        
+        - alternatives: emacs-alternatives
 {% endif %}
